@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/vc-002-core-logic-reliability
+      - feature/vc-004-monitoring-sms-policy
   pull_request:
 
 permissions:
@@ -14,7 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and run host tests
+      - name: Compile and run VC-002 logic tests
         run: |
           g++ -std=c++17 -Iinclude test/test_logic.cpp -o test_logic
           ./test_logic
+      - name: Compile and run SMS policy tests
+        run: |
+          g++ -std=c++17 -Iinclude test/test_sms_policy.cpp -o test_sms_policy
+          ./test_sms_policy
