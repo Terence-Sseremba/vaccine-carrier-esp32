@@ -1,0 +1,20 @@
+name: Host C++ tests
+
+on:
+  push:
+    branches:
+      - feature/vc-002-core-logic-reliability
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run host tests
+        run: |
+          g++ -std=c++17 -Iinclude test/test_logic.cpp -o test_logic
+          ./test_logic
