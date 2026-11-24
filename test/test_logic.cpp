@@ -1,5 +1,6 @@
 // Host-side assertions: g++ -std=c++17 -Iinclude test/test_logic.cpp -o test_logic
 #include <cassert>
+#include <cstdint>
 #include <limits>
 #include "logic.h"
 
@@ -17,7 +18,7 @@ int main() {
   assert(classifyTemperature(std::numeric_limits<float>::infinity()) == TempState::SensorFault);
   assert(classifyTemperature(-std::numeric_limits<float>::infinity()) == TempState::SensorFault);
 
-  constexpr unsigned long repeatMs = 60000UL;
+  constexpr uint32_t repeatMs = 60000U;
   AlertTracker tracker;
   auto alert = updateAlert(tracker, TempState::SensorFault, 0UL, repeatMs);
   assert(alert.stateChanged && alert.alarmActive && alert.reminderDue);
@@ -68,14 +69,14 @@ int main() {
   assert(alert.stateChanged && alert.alarmActive && alert.reminderDue);
   assert(tracker.previousState == TempState::TooHot && tracker.lastReminder == 186006UL);
 
-  // Unsigned elapsed-time subtraction remains valid across millis() rollover.
+  // The ESP32 millis() boundary is 32-bit even on a 64-bit host.
   AlertTracker wrapTracker;
-  const unsigned long nearWrap = std::numeric_limits<unsigned long>::max() - 100UL;
-  alert = updateAlert(wrapTracker, TempState::TooHot, nearWrap, 150UL);
+  const uint32_t nearWrap = std::numeric_limits<uint32_t>::max() - 100U;
+  alert = updateAlert(wrapTracker, TempState::TooHot, nearWrap, 150U);
   assert(alert.reminderDue);
-  alert = updateAlert(wrapTracker, TempState::TooHot, 48UL, 150UL);
+  alert = updateAlert(wrapTracker, TempState::TooHot, 48U, 150U);
   assert(!alert.reminderDue);
-  alert = updateAlert(wrapTracker, TempState::TooHot, 49UL, 150UL);
+  alert = updateAlert(wrapTracker, TempState::TooHot, 49U, 150U);
   assert(alert.reminderDue);
   return 0;
 }

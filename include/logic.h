@@ -1,5 +1,6 @@
 #pragma once
 #include <math.h>
+#include <stdint.h>
 
 enum class TempState { SensorFault, TooCold, Normal, TooHot };
 
@@ -31,15 +32,15 @@ struct AlertDecision {
 struct AlertTracker {
   TempState previousState = TempState::SensorFault;
   bool hasPrevious = false;
-  unsigned long lastReminder = 0;
+  uint32_t lastReminder = 0;
   bool reminderScheduled = false;
 };
 
 inline AlertDecision decideAlert(TempState current, TempState previous,
-                                 bool hasPrevious, unsigned long now,
-                                 unsigned long lastReminder,
+                                 bool hasPrevious, uint32_t now,
+                                 uint32_t lastReminder,
                                  bool reminderScheduled,
-                                 unsigned long repeatMs) {
+                                 uint32_t repeatMs) {
   const bool changed = !hasPrevious || current != previous;
   const bool active = current != TempState::Normal;
   const bool reminder = active &&
@@ -48,7 +49,7 @@ inline AlertDecision decideAlert(TempState current, TempState previous,
 }
 
 inline AlertDecision updateAlert(AlertTracker& tracker, TempState current,
-                                 unsigned long now, unsigned long repeatMs) {
+                                 uint32_t now, uint32_t repeatMs) {
   const AlertDecision decision = decideAlert(
       current, tracker.previousState, tracker.hasPrevious, now,
       tracker.lastReminder, tracker.reminderScheduled, repeatMs);
