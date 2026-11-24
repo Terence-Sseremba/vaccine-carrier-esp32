@@ -12,11 +12,9 @@ DallasTemperature temperatureSensor(&oneWire);
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 bool oledPresent = false;
 bool sensorPresent = false;
-TempState lastState = TempState::SensorFault;
-bool hasState = false;
+AlertTracker alertTracker;
 unsigned long previousRead = 0;
 unsigned long previousStatus = 0;
-unsigned long previousAlarm = 0;
 float lastTemperature = NAN;
 
 void showStatus(float temp, TempState state) {
@@ -62,41 +60,41 @@ void setup() {
 
 void loop() {
   const unsigned long now = millis();
-  if (!hasState || now - previousRead >= READ_INTERVAL_MS) {
+  if (!alertTracker.hasPrevious || now - previousRead >= READ_INTERVAL_MS) {
     previousRead = now;
+    lastTemperature = NAN;
+    if (!sensorPresent) {
+      temperatureSensor.begin();
+      sensorPresent = temperatureSensor.getDeviceCount() > 0;
+    }
     // DS18B20 conversion can block for up to ~750ms at 12 bits.
     if (sensorPresent) {
       temperatureSensor.requestTemperatures();
       lastTemperature = temperatureSensor.getTempCByIndex(0);
-    } else {
-      lastTemperature = NAN;
-      temperatureSensor.begin();
-      sensorPresent = temperatureSensor.getDeviceCount() > 0;
+      if (classifyTemperature(lastTemperature, TEMP_MIN_C, TEMP_MAX_C) ==
+          TempState::SensorFault) {
+        sensorPresent = false; // Rescan on the next polling cycle.
+      }
     }
-    TempState state = classifyTemperature(lastTemperature,TEMP_MIN_C,TEMP_MAX_C);
-    const bool changed = !hasState || state != lastState;
-    if (changed) {
+    const TempState state = classifyTemperature(lastTemperature, TEMP_MIN_C, TEMP_MAX_C);
+    const AlertDecision alert = updateAlert(alertTracker, state, millis(), ALERT_REPEAT_MS);
+    if (alert.stateChanged) {
       Serial.print("STATE CHANGE: ");
       Serial.println(stateText(state));
       recordEvent(state, lastTemperature);
-      lastState = state;
-      hasState = true;
     }
-    const bool alarm = state != TempState::Normal;
-    digitalWrite(PIN_BUZZER, alarm ? HIGH : LOW);
-    if (alarm && (!previousAlarm || now - previousAlarm >= ALERT_REPEAT_MS)) {
+    digitalWrite(PIN_BUZZER, alert.alarmActive ? HIGH : LOW);
+    if (alert.reminderDue) {
       // Demonstrate a reminder event; not an actual remote delivery.
       Serial.print("ALARM REMINDER: ");
       Serial.println(stateText(state));
-      previousAlarm = now;
     }
-    if (!alarm) previousAlarm = 0;
     showStatus(lastTemperature, state);
   }
   if (now - previousStatus >= STATUS_INTERVAL_MS) {
     previousStatus = now;
     Serial.print("STATUS: ");
-    Serial.print(stateText(lastState));
+    Serial.print(stateText(alertTracker.previousState));
     Serial.print(" T=");
     Serial.println(lastTemperature);
   }

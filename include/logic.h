@@ -21,3 +21,44 @@ inline const char* stateText(TempState s) {
   }
   return "UNKNOWN";
 }
+
+struct AlertDecision {
+  bool stateChanged;
+  bool alarmActive;
+  bool reminderDue;
+};
+
+struct AlertTracker {
+  TempState previousState = TempState::SensorFault;
+  bool hasPrevious = false;
+  unsigned long lastReminder = 0;
+  bool reminderScheduled = false;
+};
+
+inline AlertDecision decideAlert(TempState current, TempState previous,
+                                 bool hasPrevious, unsigned long now,
+                                 unsigned long lastReminder,
+                                 bool reminderScheduled,
+                                 unsigned long repeatMs) {
+  const bool changed = !hasPrevious || current != previous;
+  const bool active = current != TempState::Normal;
+  const bool reminder = active &&
+      (changed || !reminderScheduled || now - lastReminder >= repeatMs);
+  return {changed, active, reminder};
+}
+
+inline AlertDecision updateAlert(AlertTracker& tracker, TempState current,
+                                 unsigned long now, unsigned long repeatMs) {
+  const AlertDecision decision = decideAlert(
+      current, tracker.previousState, tracker.hasPrevious, now,
+      tracker.lastReminder, tracker.reminderScheduled, repeatMs);
+  tracker.previousState = current;
+  tracker.hasPrevious = true;
+  if (!decision.alarmActive) {
+    tracker.reminderScheduled = false;
+  } else if (decision.reminderDue) {
+    tracker.lastReminder = now;
+    tracker.reminderScheduled = true;
+  }
+  return decision;
+}
