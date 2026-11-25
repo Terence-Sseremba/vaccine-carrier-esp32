@@ -19,3 +19,5 @@ constexpr uint32_t READ_INTERVAL_MS = 2000U;
 constexpr uint32_t STATUS_INTERVAL_MS = 10000U;
 constexpr uint32_t ALERT_REPEAT_MS = 60000U;
 constexpr uint32_t SMS_REPEAT_MS = 300000U;
+// SIM800L breakout, UART baud and power-on method require hardware validation.
+constexpr uint32_t GSM_UART_BAUD = 9600U;

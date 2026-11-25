@@ -5,6 +5,7 @@ on:
     branches:
       - feature/vc-002-core-logic-reliability
       - feature/vc-004-monitoring-sms-policy
+      - feature/vc-005-sim800l-transport
   pull_request:
 
 permissions:
@@ -23,3 +24,7 @@ jobs:
         run: |
           g++ -std=c++17 -Iinclude test/test_sms_policy.cpp -o test_sms_policy
           ./test_sms_policy
+      - name: Compile and run SIM800L transport tests
+        run: |
+          g++ -std=c++17 -Iinclude test/test_sim800_transport.cpp -o test_sim800_transport
+          ./test_sim800_transport

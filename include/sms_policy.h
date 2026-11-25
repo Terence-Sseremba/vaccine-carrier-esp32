@@ -11,6 +11,8 @@ struct SmsEvent {
   SmsEventKind kind = SmsEventKind::None;
   TempState state = TempState::Normal;
   uint32_t occurredAtMs = 0;
+  uint32_t id = 0;       // Assigned by the transport coordinator, not the policy.
+  uint32_t episode = 0;  // One abnormal period, including its recovery.
 };
 
 struct SmsPolicyTracker {
@@ -57,6 +59,7 @@ struct SmsOutbox {
   uint8_t count = 0;
   uint32_t droppedFull = 0;
   uint32_t droppedStale = 0;
+  uint32_t droppedObsolete = 0;
 };
 
 inline void removeOldestSmsEvent(SmsOutbox& outbox) {
@@ -93,4 +96,18 @@ inline bool takeNextSmsEvent(SmsOutbox& outbox, uint32_t now, SmsEvent& event) {
   event = outbox.entries[0];
   removeOldestSmsEvent(outbox);
   return true;
+}
+
+inline void discardObsoleteSmsEvents(SmsOutbox& outbox, TempState live,
+                                     uint32_t episode, bool allowRecovery) {
+  uint8_t keep = 0;
+  for (uint8_t i = 0; i < outbox.count; ++i) {
+    const SmsEvent& event = outbox.entries[i];
+    const bool useful = event.episode == episode && event.state == live &&
+        (live != TempState::Normal ||
+         (allowRecovery && event.kind == SmsEventKind::Recovery));
+    if (useful) outbox.entries[keep++] = event;
+    else ++outbox.droppedObsolete;
+  }
+  outbox.count = keep;
 }
