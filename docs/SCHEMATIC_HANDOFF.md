@@ -1,4 +1,4 @@
-# VC-004 hardware handoff — provisional development settings
+# VC-005 hardware handoff — provisional development settings
 
 This is an educational prototype, not a validated medical device. The original
 teammate KiCad file is preserved locally at `.vc002-reference/test/IEEE work.kicad_sch`.
@@ -43,30 +43,56 @@ until its 2.8 V interface and the ESP32's 3.3 V signals have been matched.
 
 VC-002 local Alert Policy A remains active with a 60-second reminder interval.
 Sampling is every 2 seconds; temperature limits default to 2.0–8.0 °C.
-The current DallasTemperature conversion can block for roughly 750 ms at
-12-bit resolution. VC-005 must keep modem command processing bounded so sensor
-and OLED updates continue during GSM failures.
+The DallasTemperature request now starts a cooperative conversion. The loop
+continues servicing modem UART while waiting 750 ms before reading the 12-bit
+result. Sensor rediscovery still requires a fresh conversion before recovery.
 
-VC-004 generates board-independent SMS **events**: immediate on each abnormal
-transition, every 5 minutes while an abnormal state is stable, and once on
-recovery to Normal. Events are logged to Serial as `NOT SENT`. No SMS transport,
-recipient, transmission attempt or modem-confirmed submission exists yet.
+VC-004 still generates board-independent SMS **events**: immediate on each
+abnormal transition, every 5 minutes while abnormal, and once on recovery to
+Normal. VC-005 queues those events and uses UART2 for cooperative SIM800L AT
+communication. Copy `include/local_sms_config.example.h` to the Git-ignored
+`include/local_sms_config.h` and set `SMS_RECIPIENT` to an international number
+with an optional leading `+` and 6–15 digits. Missing or invalid configuration
+disables SMS submission while local monitoring continues. Never commit or log
+a real recipient, SIM identifier or credential.
 
-`SmsOutbox` is an optional fixed eight-event queue for VC-005. If full, it
+`SmsOutbox` is a fixed eight-event queue. If full, it
 evicts the oldest event and counts that loss so the newest state is retained.
 Events at least 15 minutes old are discarded and counted as stale. Dequeuing
-hands an event to the future transport; it does **not** mark an SMS attempt or
-success. VC-005 should hold the active message separately, allow at most two
-bounded attempts with at least 30 seconds between failed attempts, and record
-modem submission only after a positive final AT response. A failed attempt
-must never trigger an unbounded retry loop. Submission to the modem does not
-prove delivery to the recipient. Keep the recipient in ignored local
-configuration, never committed source.
+transfers an event into one separately owned active slot; it does **not** mark
+an attempt or success. The transport permits at most two attempts per event,
+at least 30 seconds apart. It checks `AT`, `ATE0`, `AT+CPIN?`, `AT+CREG?`, and
+`AT+CMGF=1` before `AT+CMGS`. It accepts home and roaming registration.
+After the `>` prompt it sends text and Ctrl-Z, then requires `+CMGS` and final
+`OK` for `SUBMITTED`. That means modem acknowledgement, **not** recipient
+delivery. The final response wait is cooperative and bounded at 65 seconds.
+Explicit transient rejection may be retried once. Known permanent CMS errors
+halt the transport in `FAIL` until configuration/operator intervention. A
+timeout after Ctrl-Z is `AMBIGUOUS` and never retries that event. A pre-payload timeout sends ESC,
+reprobes the modem, and observes retry spacing.
 
-The OLED uses a compact 128×32 layout and reserves a `GSM --` field for a
-future transport state. A display initialization failure leaves sensor and
+On reconnection the firmware waits for a fresh temperature sample, removes
+obsolete queued states, and reconciles with the live state. Persistent high,
+low or sensor-fault states can produce a current-state event even if historical
+events expired. Recovery is sent only when an abnormal state in that episode
+was previously acknowledged by the modem. A state change before payload
+cancels the old request; after payload its outcome is observed before new-state
+reconciliation. Ambiguous abnormal submissions suppress immediate synthetic
+resend for five minutes; an ambiguous recovery is not regenerated for the same
+episode. Equivalent reminders are coalesced while queued or active. Episode
+history is RAM-only and is lost on reboot.
+
+The OLED uses a compact 128×32 layout and reserves a small modem status field
+(`OFF`, `INIT`, `WAIT`, `READY`, `SEND`, `ACCEPT`, `FAIL`, `UNCERT`). `ACCEPT`
+means modem acknowledgement only. A display initialization failure leaves sensor and
 Serial monitoring active. The buzzer is excluded. SD logging, Wi-Fi
 notifications and voice calls are deferred and have no firmware dependency.
+
+The prototype assumes an already powered modem and an unlocked SIM. It does
+not drive PWRKEY or enter a SIM PIN. Text messages use short ASCII content; it
+does not implement multipart SMS, delivery reports, persistent retry history,
+or recipient delivery confirmation. Physical UART and SMS operation remain
+unverified until tested with the chosen breakout, supply, SIM and network.
 
 ## Required physical validation
 

@@ -3,3 +3,5 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+# Local SMS destination. Copy the tracked example and supply a test recipient.
+include/local_sms_config.h
