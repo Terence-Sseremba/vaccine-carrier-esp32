@@ -6,6 +6,7 @@ on:
       - feature/vc-002-core-logic-reliability
       - feature/vc-004-monitoring-sms-policy
       - feature/vc-005-sim800l-transport
+      - feature/vc-006b-logging-core
   pull_request:
 
 permissions:
@@ -28,3 +29,7 @@ jobs:
         run: |
           g++ -std=c++17 -Iinclude test/test_sim800_transport.cpp -o test_sim800_transport
           ./test_sim800_transport
+      - name: Compile and run logging core tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -pedantic -Iinclude test/test_logging.cpp -o test_logging
+          ./test_logging
